@@ -39,10 +39,10 @@ export const getIssues = async (req: Request, res: Response): Promise<void> => {
 
 export const getIssueById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const issueId = String(req.params.id);
     const issue = await prisma.student_issues.findUnique({
-      where: { id },
-      include: { author: { select: { name: true, role: true } } },
+      where: { id: issueId },
+      include: { author: { select: { name: true, role_id: true } } },
     });
 
     if (!issue) {
@@ -68,9 +68,9 @@ export const createIssue = async (req: Request, res: Response): Promise<void> =>
 
     const issue = await prisma.student_issues.create({
       data: {
-        title,
-        description,
-        category,
+        title: String(title),
+        description: String(description),
+        category: String(category),
         author_id: userId!,
       },
     });
@@ -83,10 +83,10 @@ export const createIssue = async (req: Request, res: Response): Promise<void> =>
 
 export const upvote = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const issueId = String(req.params.id);
     const userId = req.user?.id;
 
-    const issue = await upvoteIssue(id, userId!);
+    const issue = await upvoteIssue(issueId, userId!);
     sendSuccess(res, { issue });
   } catch (error: any) {
     if (error.message === 'User has already voted for this issue') {
@@ -99,10 +99,10 @@ export const upvote = async (req: Request, res: Response): Promise<void> => {
 
 export const removeVote = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const issueId = String(req.params.id);
     const userId = req.user?.id;
 
-    const issue = await removeUpvote(id, userId!);
+    const issue = await removeUpvote(issueId, userId!);
     sendSuccess(res, { issue });
   } catch (error: any) {
     if (error.message === 'Vote not found') {
@@ -115,7 +115,7 @@ export const removeVote = async (req: Request, res: Response): Promise<void> => 
 
 export const changeStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const issueId = String(req.params.id);
     const { status, reason } = req.body;
     const userId = req.user?.id;
 
@@ -124,7 +124,7 @@ export const changeStatus = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const issue = await prisma.student_issues.findUnique({ where: { id } });
+    const issue = await prisma.student_issues.findUnique({ where: { id: issueId } });
     if (!issue) {
       sendError(res, 'NOT_FOUND', 'Issue not found', 404);
       return;
@@ -132,16 +132,16 @@ export const changeStatus = async (req: Request, res: Response): Promise<void> =
 
     const updatedIssue = await prisma.$transaction(async (tx) => {
       const updated = await tx.student_issues.update({
-        where: { id },
-        data: { status },
+        where: { id: issueId },
+        data: { status: String(status) },
       });
 
       await tx.issue_status_history.create({
         data: {
-          issue_id: id,
+          issue_id: issueId,
           old_status: issue.status,
-          new_status: status,
-          reason,
+          new_status: String(status),
+          reason: reason ? String(reason) : null,
           changed_by: userId!,
         },
       });
@@ -157,7 +157,7 @@ export const changeStatus = async (req: Request, res: Response): Promise<void> =
 
 export const respondToIssue = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const issueId = String(req.params.id);
     const { response } = req.body;
     const userId = req.user?.id;
 
@@ -168,8 +168,8 @@ export const respondToIssue = async (req: Request, res: Response): Promise<void>
 
     const managementResponse = await prisma.management_responses.create({
       data: {
-        response,
-        issue_id: id,
+        response: String(response),
+        issue_id: issueId,
         management_user_id: userId!,
       },
     });

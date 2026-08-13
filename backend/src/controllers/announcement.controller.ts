@@ -4,48 +4,22 @@ import { sendSuccess, sendError } from '../utils/response';
 
 export const getAnnouncements = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { priority, official_clarification, search, page = '1', limit = '20' } = req.query;
+    const { priority, page = '1', limit = '20' } = req.query;
 
     const where: any = {};
-    if (priority) where.priority = String(priority).toUpperCase();
-    if (official_clarification !== undefined) {
-      where.official_clarification = official_clarification === 'true';
-    }
-    if (search) {
-      where.OR = [
-        { title: { contains: String(search), mode: 'insensitive' } },
-        { content: { contains: String(search), mode: 'insensitive' } },
-      ];
-    }
-
-    const pageNum = Math.max(1, Number(page));
-    const limitNum = Math.max(1, Number(limit));
+    if (priority) where.priority = String(priority);
 
     const [announcements, total] = await Promise.all([
       prisma.announcements.findMany({
         where,
+        skip: (Number(page) - 1) * Number(limit),
+        take: Number(limit),
         orderBy: { created_at: 'desc' },
-        skip: (pageNum - 1) * limitNum,
-        take: limitNum,
-        include: {
-          author: { select: { id: true, name: true, role: { select: { name: true } } } },
-          comments: {
-            orderBy: { created_at: 'asc' },
-          },
-        },
       }),
       prisma.announcements.count({ where }),
     ]);
 
-    sendSuccess(res, {
-      announcements,
-      pagination: {
-        total,
-        page: pageNum,
-        limit: limitNum,
-        totalPages: Math.ceil(total / limitNum),
-      },
-    });
+    sendSuccess(res, { announcements, total });
   } catch (error) {
     sendError(res, 'INTERNAL_ERROR', 'Failed to fetch announcements', 500);
   }
@@ -53,15 +27,10 @@ export const getAnnouncements = async (req: Request, res: Response): Promise<voi
 
 export const getAnnouncementById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const announcementId = String(req.params.id);
     const announcement = await prisma.announcements.findUnique({
-      where: { id },
-      include: {
-        author: { select: { id: true, name: true, role: { select: { name: true } } } },
-        comments: {
-          orderBy: { created_at: 'asc' },
-        },
-      },
+      where: { id: announcementId },
+      include: { comments: true },
     });
 
     if (!announcement) {
@@ -77,75 +46,65 @@ export const getAnnouncementById = async (req: Request, res: Response): Promise<
 
 export const createAnnouncement = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, content, priority = 'NORMAL', official_clarification = false, comments_enabled = true } = req.body;
+    const { title, content, priority, official_clarification, comments_enabled } = req.body;
     const userId = req.user?.id;
 
-    if (!title || !content) {
-      sendError(res, 'VALIDATION_ERROR', 'Title and content are required');
+    if (!title || !content || !priority) {
+      sendError(res, 'VALIDATION_ERROR', 'Title, content, and priority are required');
       return;
     }
 
     const announcement = await prisma.announcements.create({
       data: {
-        title,
-        content,
-        priority: priority.toUpperCase(),
+        title: String(title),
+        content: String(content),
+        priority: String(priority),
         official_clarification: Boolean(official_clarification),
-        comments_enabled: Boolean(comments_enabled),
+        comments_enabled: comments_enabled !== undefined ? Boolean(comments_enabled) : true,
         author_id: userId!,
-      },
-      include: {
-        author: { select: { id: true, name: true, role: { select: { name: true } } } },
       },
     });
 
-    // Notify all users about new announcement
-    const allUsers = await prisma.users.findMany({ select: { id: true } });
-    if (allUsers.length > 0) {
-      const notifications = allUsers.map(u => ({
-        type: 'ANNOUNCEMENT',
-        content: `New official announcement: "${title}"`,
-        user_id: u.id,
-      }));
-      await prisma.notifications.createMany({ data: notifications });
-    }
-
     sendSuccess(res, { announcement }, 201);
   } catch (error) {
-    sendError(res, 'INTERNAL_ERROR', 'Failed to publish announcement', 500);
+    sendError(res, 'INTERNAL_ERROR', 'Failed to create announcement', 500);
   }
 };
 
-export const addAnnouncementComment = async (req: Request, res: Response): Promise<void> => {
+export const updateAnnouncement = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
-    const { content } = req.body;
+    const announcementId = String(req.params.id);
+    const announcement = await prisma.announcements.findUnique({ where: { id: announcementId } });
 
-    if (!content) {
-      sendError(res, 'VALIDATION_ERROR', 'Comment content is required');
-      return;
-    }
-
-    const announcement = await prisma.announcements.findUnique({ where: { id } });
     if (!announcement) {
       sendError(res, 'NOT_FOUND', 'Announcement not found', 404);
       return;
     }
 
-    if (!announcement.comments_enabled) {
-      sendError(res, 'FORBIDDEN', 'Comments are disabled for this announcement', 403);
+    const updated = await prisma.announcements.update({
+      where: { id: announcementId },
+      data: req.body,
+    });
+
+    sendSuccess(res, { announcement: updated });
+  } catch (error) {
+    sendError(res, 'INTERNAL_ERROR', 'Failed to update announcement', 500);
+  }
+};
+
+export const deleteAnnouncement = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const announcementId = String(req.params.id);
+    const announcement = await prisma.announcements.findUnique({ where: { id: announcementId } });
+
+    if (!announcement) {
+      sendError(res, 'NOT_FOUND', 'Announcement not found', 404);
       return;
     }
 
-    const comment = await prisma.announcement_comments.create({
-      data: {
-        content,
-        announcement_id: id,
-      },
-    });
-
-    sendSuccess(res, { comment }, 201);
+    await prisma.announcements.delete({ where: { id: announcementId } });
+    sendSuccess(res, null, 204);
   } catch (error) {
-    sendError(res, 'INTERNAL_ERROR', 'Failed to add comment', 500);
+    sendError(res, 'INTERNAL_ERROR', 'Failed to delete announcement', 500);
   }
 };

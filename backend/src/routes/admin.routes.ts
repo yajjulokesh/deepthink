@@ -1,22 +1,16 @@
 import { Router } from 'express';
-import {
-  getSystemSettings,
-  updateUpvoteThreshold,
-  getAnalytics,
-  getUsers,
-  updateUserRole,
-} from '../controllers/admin.controller';
+import { getUsers, updateUserRole, getReports, getAnalytics, getSettings, updateSettings } from '../controllers/admin.controller';
 import { requireAuth, requireRole } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-router.use(requireAuth);
-router.use(requireRole(['ADMIN', 'MANAGEMENT']));
+router.use(requireAuth, requireRole(['ADMIN']));
 
-router.get('/settings', getSystemSettings);
-router.patch('/settings/threshold', requireRole(['ADMIN']), updateUpvoteThreshold);
+router.get('/users', getUsers);
+router.patch('/users/:id/role', updateUserRole);
+router.get('/reports', getReports);
 router.get('/analytics', getAnalytics);
-router.get('/users', requireRole(['ADMIN']), getUsers);
-router.patch('/users/:userId/role', requireRole(['ADMIN']), updateUserRole);
+router.get('/settings', getSettings);
+router.patch('/settings', updateSettings);
 
 export default router;
