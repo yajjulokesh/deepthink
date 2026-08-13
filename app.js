@@ -191,9 +191,43 @@
   // --------------------------------------------------------------------------
   // RENDER ENGINE
   // --------------------------------------------------------------------------
+  const BACKEND_API = 'https://deepthink-lsj5.onrender.com/api/v1';
+
+  async function syncBackendData() {
+    try {
+      const [issuesRes, ancRes, lfRes] = await Promise.allSettled([
+        fetch(`${BACKEND_API}/issues`),
+        fetch(`${BACKEND_API}/announcements`),
+        fetch(`${BACKEND_API}/lost-found`)
+      ]);
+
+      if (issuesRes.status === 'fulfilled' && issuesRes.value.ok) {
+        const json = await issuesRes.value.json();
+        if (json.data && json.data.issues && json.data.issues.length > 0) {
+          state.issues = json.data.issues.map(i => ({
+            id: i.id,
+            title: i.title,
+            description: i.description,
+            category: i.category,
+            status: i.status || 'SUBMITTED',
+            upvotes: i.current_votes || i.upvoteCount || 0,
+            createdBy: i.author_id || i.createdBy || 'Student Rep',
+            createdAt: new Date(i.created_at || i.createdAt).toLocaleDateString(),
+            threshold: 100,
+            history: [{ status: i.status || 'SUBMITTED', time: 'Recently', note: 'Logged in system' }]
+          }));
+        }
+      }
+      if (typeof renderApp === 'function') renderApp();
+    } catch (e) {
+      console.log('Backend sync offline, running interactive demo mode');
+    }
+  }
+
   function init() {
     bindEvents();
     renderApp();
+    syncBackendData();
   }
 
   function bindEvents() {
