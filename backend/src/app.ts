@@ -20,6 +20,22 @@ app.use('/api/v1/announcements', announcementRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'Welcome to Student Portal API',
+    endpoints: {
+      health: '/health',
+      auth: '/api/v1/auth',
+      issues: '/api/v1/issues',
+      announcements: '/api/v1/announcements',
+      lostFound: '/api/v1/lost-found',
+      notifications: '/api/v1/notifications',
+      admin: '/api/v1/admin'
+    }
+  });
+});
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Student Portal API is operational' });
 });
