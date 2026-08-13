@@ -1,0 +1,24 @@
+# Student Portal Backend Tasks
+
+- `[x]` Scaffold Node.js + TypeScript + Express project
+  - `[x]` Initialize package.json and install dependencies (Express, TS, Prisma, Zod, JWT, bcrypt)
+  - `[x]` Setup TypeScript configuration (tsconfig.json)
+  - `[x]` Setup basic project structure (src/routes, src/controllers, src/services, etc.)
+- `[x]` Database Configuration
+  - `[x]` Create Prisma schema with the shared core entities
+  - `[x]` Setup database connection configuration
+- `[x]` Authentication & Authorization
+  - `[x]` Implement JWT generation and validation
+  - `[x]` Implement role-based middleware guards
+  - `[x]` Auth endpoints (login, current-user)
+- `[x]` API Implementation
+  - `[ ]` Lost & Found API
+  - `[ ]` Announcements API
+  - `[x]` Student Issues API (with Upvote system & transaction logic)
+  - `[ ]` Notifications API
+  - `[ ]` Admin APIs
+- `[ ]` Testing & Verification
+  - `[ ]` Setup Jest/Supertest
+  - `[ ]` Write integration tests (especially the threshold logic)
+- `[ ]` Final Documentation
+  - `[ ]` Create API documentation for the frontend team

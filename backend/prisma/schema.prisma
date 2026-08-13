@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model users {
+  id                   String                 @id @default(uuid())
+  name                 String
+  email                String                 @unique
+  password             String
+  role_id              String
+  role                 roles                  @relation(fields: [role_id], references: [id])
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  lost_found_posts     lost_found_posts[]
+  lost_found_comments  lost_found_comments[]
+  announcements        announcements[]
+  student_issues       student_issues[]
+  issue_votes          issue_votes[]
+  issue_comments       issue_comments[]
+  management_responses management_responses[]
+  notifications        notifications[]
+  reports              reports[]
+}
+
+model roles {
+  id          String   @id @default(uuid())
+  name        String   @unique // STUDENT, REPRESENTATIVE, MANAGEMENT, ADMIN
+  permissions String?  // Optional JSON or comma-separated string for granular permissions
+  users       users[]
+}
+
+model lost_found_posts {
+  id          String                 @id @default(uuid())
+  title       String
+  description String
+  type        String                 // LOST, FOUND
+  category    String
+  location    String
+  date        DateTime
+  status      String                 @default("OPEN") // OPEN, RESOLVED, CLOSED
+  user_id     String
+  user        users                  @relation(fields: [user_id], references: [id])
+  created_at  DateTime               @default(now())
+  updated_at  DateTime               @updatedAt
+  comments    lost_found_comments[]
+  attachments attachments[]          @relation("LostFoundAttachments")
+  reports     reports[]              @relation("LostFoundReports")
+}
+
+model lost_found_comments {
+  id         String           @id @default(uuid())
+  content    String
+  post_id    String
+  post       lost_found_posts @relation(fields: [post_id], references: [id])
+  user_id    String
+  user       users            @relation(fields: [user_id], references: [id])
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+  reports    reports[]        @relation("LostFoundCommentReports")
+}
+
+model announcements {
+  id                     String                  @id @default(uuid())
+  title                  String
+  content                String
+  priority               String                  // NORMAL, URGENT
+  official_clarification Boolean                 @default(false)
+  comments_enabled       Boolean                 @default(true)
+  author_id              String
+  author                 users                   @relation(fields: [author_id], references: [id])
+  created_at             DateTime                @default(now())
+  updated_at             DateTime                @updatedAt
+  comments               announcement_comments[]
+  attachments            attachments[]           @relation("AnnouncementAttachments")
+}
+
+model announcement_comments {
+  id              String        @id @default(uuid())
+  content         String
+  announcement_id String
+  announcement    announcements @relation(fields: [announcement_id], references: [id])
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+}
+
+model student_issues {
+  id                   String                 @id @default(uuid())
+  title                String
+  description          String
+  category             String
+  status               String                 @default("SUBMITTED") // SUBMITTED, UNDER_REVIEW, ACKNOWLEDGED, ACTION_PLANNED, IN_PROGRESS, RESOLVED, REJECTED, DUPLICATE
+  current_votes        Int                    @default(0)
+  threshold_reached    Boolean                @default(false)
+  author_id            String
+  author               users                  @relation(fields: [author_id], references: [id])
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+  votes                issue_votes[]
+  comments             issue_comments[]
+  management_responses management_responses[]
+  status_history       issue_status_history[]
+  attachments          attachments[]          @relation("IssueAttachments")
+  reports              reports[]              @relation("IssueReports")
+}
+
+model issue_votes {
+  id         String         @id @default(uuid())
+  issue_id   String
+  issue      student_issues @relation(fields: [issue_id], references: [id])
+  user_id    String
+  user       users          @relation(fields: [user_id], references: [id])
+  created_at DateTime       @default(now())
+
+  @@unique([issue_id, user_id]) // Prevent duplicate votes at DB level
+}
+
+model issue_comments {
+  id         String         @id @default(uuid())
+  content    String
+  issue_id   String
+  issue      student_issues @relation(fields: [issue_id], references: [id])
+  user_id    String
+  user       users          @relation(fields: [user_id], references: [id])
+  created_at DateTime       @default(now())
+  updated_at DateTime       @updatedAt
+  reports    reports[]      @relation("IssueCommentReports")
+}
+
+model management_responses {
+  id                 String         @id @default(uuid())
+  response           String
+  issue_id           String
+  issue              student_issues @relation(fields: [issue_id], references: [id])
+  management_user_id String
+  management_user    users          @relation(fields: [management_user_id], references: [id])
+  created_at         DateTime       @default(now())
+  updated_at         DateTime       @updatedAt
+}
+
+model issue_status_history {
+  id         String         @id @default(uuid())
+  issue_id   String
+  issue      student_issues @relation(fields: [issue_id], references: [id])
+  old_status String
+  new_status String
+  reason     String?
+  changed_by String
+  created_at DateTime       @default(now())
+}
+
+model notifications {
+  id         String   @id @default(uuid())
+  type       String   // LOST_FOUND_COMMENT, ISSUE_THRESHOLD_REACHED, etc.
+  content    String
+  is_read    Boolean  @default(false)
+  user_id    String
+  user       users    @relation(fields: [user_id], references: [id])
+  created_at DateTime @default(now())
+}
+
+model attachments {
+  id              String            @id @default(uuid())
+  file_url        String
+  file_type       String
+  file_size       Int
+  file_name       String
+  lost_found_id   String?
+  lost_found      lost_found_posts? @relation("LostFoundAttachments", fields: [lost_found_id], references: [id])
+  announcement_id String?
+  announcement    announcements?    @relation("AnnouncementAttachments", fields: [announcement_id], references: [id])
+  issue_id        String?
+  issue           student_issues?   @relation("IssueAttachments", fields: [issue_id], references: [id])
+  created_at      DateTime          @default(now())
+}
+
+model reports {
+  id                     String               @id @default(uuid())
+  reason                 String
+  status                 String               @default("PENDING") // PENDING, REVIEWED, RESOLVED, DISMISSED
+  reporter_id            String
+  reporter               users                @relation(fields: [reporter_id], references: [id])
+  lost_found_post_id     String?
+  lost_found_post        lost_found_posts?    @relation("LostFoundReports", fields: [lost_found_post_id], references: [id])
+  lost_found_comment_id  String?
+  lost_found_comment     lost_found_comments? @relation("LostFoundCommentReports", fields: [lost_found_comment_id], references: [id])
+  issue_id               String?
+  issue                  student_issues?      @relation("IssueReports", fields: [issue_id], references: [id])
+  issue_comment_id       String?
+  issue_comment          issue_comments?      @relation("IssueCommentReports", fields: [issue_comment_id], references: [id])
+  created_at             DateTime             @default(now())
+  updated_at             DateTime             @updatedAt
+}
+
+model system_settings {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String   // JSON stringified value to hold threshold info
+  description String?
+  updated_at  DateTime @updatedAt
+}
